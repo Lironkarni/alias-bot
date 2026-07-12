@@ -19,6 +19,8 @@
     timerText: document.getElementById('timerText'),
     timerProgress: document.getElementById('timerProgress'),
     finalScore: document.getElementById('finalScore'),
+    endStatus: document.getElementById('endStatus'),
+    endEmoji: document.getElementById('endEmoji'),
   };
 
   const TURN_SECONDS = 60;
@@ -70,6 +72,18 @@
   socket.on('turn_ended', (payload) => {
     clearInterval(countdownInterval);
     el.finalScore.textContent = payload.turnScore;
+
+    if (payload.reason === 'host_skip') {
+      el.endEmoji.textContent = '⏭️';
+      el.endStatus.textContent = 'מנהל המשחק דילג על התור';
+    } else if (payload.reason === 'game_closed') {
+      el.endEmoji.textContent = '🛑';
+      el.endStatus.textContent = 'המשחק הופסק ע"י המנהל';
+    } else {
+      el.endEmoji.textContent = '⏱️';
+      el.endStatus.textContent = 'הזמן נגמר!';
+    }
+
     setDisabled(true);
     showOnly(el.end);
   });
