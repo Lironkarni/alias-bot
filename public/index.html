@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>אליאס</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app" class="screen state-loading">
+
+    <div id="loadingScreen" class="panel">
+      <div class="spinner"></div>
+      <p>מתחברים למשחק…</p>
+    </div>
+
+    <div id="errorScreen" class="panel hidden">
+      <div class="error-badge">✕</div>
+      <p id="errorText">משהו השתבש.</p>
+    </div>
+
+    <div id="gameScreen" class="panel hidden">
+      <div class="top-bar">
+        <span id="teamBadge" class="team-badge">קבוצה 1</span>
+        <div class="timer-wrap">
+          <svg viewBox="0 0 100 100" class="timer-ring">
+            <circle cx="50" cy="50" r="45" class="timer-track" />
+            <circle cx="50" cy="50" r="45" class="timer-progress" id="timerProgress" />
+          </svg>
+          <span id="timerText" class="timer-text">60</span>
+        </div>
+      </div>
+
+      <div class="score-line">ניקוד בתור: <span id="turnScore">0</span></div>
+
+      <div class="word-stage">
+        <div id="wordText" class="word">…</div>
+      </div>
+
+      <div class="actions">
+        <button id="skipBtn" class="btn btn-skip">➡️ עבור</button>
+        <button id="correctBtn" class="btn btn-correct">✅ הצלחנו</button>
+      </div>
+    </div>
+
+    <div id="endScreen" class="panel hidden">
+      <div class="trophy">⏱️</div>
+      <p>הזמן נגמר!</p>
+      <p class="final-score">צברתם <span id="finalScore">0</span> נקודות בתור הזה</p>
+      <p class="hint">אפשר לסגור את המסך ולחזור לקבוצה בטלגרם</p>
+    </div>
+
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

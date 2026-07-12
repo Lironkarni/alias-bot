@@ -1,0 +1,16 @@
+{
+  "name": "alias-telegram-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "telegraf": "^4.16.3",
+    "uuid": "^9.0.1"
+  }
+}
