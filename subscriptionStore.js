@@ -100,6 +100,44 @@ async function setSubscriptionExpiry(chatId, expiresAt, activatedBy = null) {
   });
 }
 
+async function listGroups() {
+  const chatIds = (await redis(['SMEMBERS', GROUP_INDEX_KEY])) || [];
+  const groups = await Promise.all(chatIds.map((chatId) => getGroup(chatId)));
+  return groups.filter(Boolean);
+}
+
+async function activateSubscription({
+  chatId,
+  expiresAt,
+  activatedBy,
+  telegramPaymentChargeId,
+  isRecurring = true,
+}) {
+  const existing = await getGroup(chatId);
+  if (!existing) throw new Error('Group not found');
+
+  const expiry = new Date(expiresAt);
+  if (Number.isNaN(expiry.getTime())) throw new Error('Invalid subscription expiry date');
+
+  if (
+    existing.telegramPaymentChargeId &&
+    existing.telegramPaymentChargeId === telegramPaymentChargeId &&
+    existing.subscriptionExpiresAt === expiry.toISOString()
+  ) {
+    return existing;
+  }
+
+  return saveGroup({
+    ...existing,
+    subscriptionExpiresAt: expiry.toISOString(),
+    subscriptionStatus: expiry.getTime() > Date.now() ? 'premium' : 'free',
+    activatedBy: String(activatedBy),
+    telegramPaymentChargeId,
+    isRecurring: Boolean(isRecurring),
+    lastPaymentAt: new Date().toISOString(),
+  });
+}
+
 async function getSubscriptionStatus(chatId) {
   const group = await getGroup(chatId);
   if (!group) return { isPremium: false, expiresAt: null, group: null };
@@ -113,7 +151,9 @@ module.exports = {
   isConfigured,
   ensureGroup,
   getGroup,
+  listGroups,
   saveGroup,
   setSubscriptionExpiry,
+  activateSubscription,
   getSubscriptionStatus,
 };

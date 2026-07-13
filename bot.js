@@ -1,11 +1,17 @@
 const { DIFFICULTY_LABELS } = require('./words');
 const subscriptionStore = require('./subscriptionStore');
+const { registerPremiumHandlers, showPremiumMenu } = require('./premium');
 
 function registerBotHandlers(bot, gameManager) {
+  registerPremiumHandlers(bot, subscriptionStore);
+
   bot.command('start', async (ctx) => {
-    if (!['group', 'supergroup'].includes(ctx.chat.type)) {
-      return ctx.reply('צריך להריץ את המשחק בתוך קבוצה, לא בצ׳אט פרטי.');
+    if (ctx.chat.type === 'private') {
+      if (ctx.startPayload === 'premium') return showPremiumMenu(ctx, subscriptionStore);
+      return ctx.reply('לניהול מנוי שלחו /premium. את המשחק עצמו מפעילים בתוך קבוצה.');
     }
+
+    if (!['group', 'supergroup'].includes(ctx.chat.type)) return;
 
     const chatId = ctx.chat.id;
 
@@ -42,36 +48,6 @@ function registerBotHandlers(bot, gameManager) {
       return ctx.reply('רק מי ששלח /start (מנהל המשחק) יכול לסגור את המשחק.');
     }
     return ctx.reply('🛑 המשחק הופסק ע"י מנהל המשחק. כדי להתחיל משחק חדש שלחו /start.');
-  });
-
-  bot.command('subscription', async (ctx) => {
-    if (!['group', 'supergroup'].includes(ctx.chat.type)) {
-      return ctx.reply('את מצב המנוי ניתן לבדוק מתוך הקבוצה.');
-    }
-
-    if (!subscriptionStore.isConfigured()) {
-      return ctx.reply('בסיס הנתונים עדיין לא הוגדר בשרת.');
-    }
-
-    try {
-      await subscriptionStore.ensureGroup(ctx.chat);
-      const status = await subscriptionStore.getSubscriptionStatus(ctx.chat.id);
-
-      if (!status.isPremium) {
-        return ctx.reply('🆓 הקבוצה משתמשת כרגע בגרסה החינמית.');
-      }
-
-      const expiry = new Intl.DateTimeFormat('he-IL', {
-        timeZone: 'Asia/Jerusalem',
-        dateStyle: 'long',
-        timeStyle: 'short',
-      }).format(status.expiresAt);
-
-      return ctx.reply(`⭐ לקבוצה יש מנוי פרימיום פעיל עד ${expiry}.`);
-    } catch (error) {
-      console.error('Failed to read subscription from Redis:', error);
-      return ctx.reply('לא הצלחנו לבדוק את מצב המנוי כרגע. נסו שוב מאוחר יותר.');
-    }
   });
 
   bot.command('players', async (ctx) => {
