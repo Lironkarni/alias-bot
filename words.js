@@ -64,7 +64,7 @@ const WORDS = [
 ];
 
 // מאגר מילים "קשה" - מושגים מופשטים, ביטויים, אתגר גדול יותר
-const HARD_WORDS = [
+const PREMIUM_WORDS = [
   'דמוקרטיה', 'בירוקרטיה', 'פרדוקס', 'גיאופוליטיקה', 'נוסטלגיה', 'קפיטליזם', 'גלובליזציה',
   'אלגוריתם', 'אינפלציה', 'אבולוציה', 'מטאפורה', 'אינטואיציה', 'פרשנות', 'ריבונות', 'אנומליה',
   'תת-מודע', 'קונפליקט', 'אימפריאליזם', 'פשרה', 'תודעה', 'זהות עצמית', 'אמפתיה', 'ציניות',
@@ -118,18 +118,22 @@ const HARD_WORDS = [
   , 'כתב חדשות', 'גשם מטאורים', 'ליקוי ירח', 'סופת חול', 'שיטפון פתאומי', 'בצורת קשה'
 ];
 
+const mediumStartIndex = PREMIUM_WORDS.indexOf('מצפן');
+const HARD_WORDS = PREMIUM_WORDS.slice(0, mediumStartIndex);
+const MEDIUM_WORDS = PREMIUM_WORDS.slice(mediumStartIndex);
+
 const DIFFICULTY_LABELS = {
   easy: 'רגיל',
+  medium: 'בינוני',
   hard: 'קשה',
-  mixed: 'מעורב',
 };
 
-const DIFFICULTY_ORDER = ['mixed', 'easy', 'hard'];
+const DIFFICULTY_ORDER = ['easy', 'medium', 'hard'];
 
 function getWordPool(difficulty) {
-  if (difficulty === 'easy') return WORDS;
+  if (difficulty === 'medium') return MEDIUM_WORDS;
   if (difficulty === 'hard') return HARD_WORDS;
-  return WORDS.concat(HARD_WORDS); // mixed
+  return WORDS;
 }
 
 function nextDifficulty(current) {
@@ -137,4 +141,4 @@ function nextDifficulty(current) {
   return DIFFICULTY_ORDER[(idx + 1) % DIFFICULTY_ORDER.length];
 }
 
-module.exports = { WORDS, HARD_WORDS, DIFFICULTY_LABELS, DIFFICULTY_ORDER, getWordPool, nextDifficulty };
+module.exports = { WORDS, MEDIUM_WORDS, HARD_WORDS, DIFFICULTY_LABELS, DIFFICULTY_ORDER, getWordPool, nextDifficulty };

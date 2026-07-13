@@ -1,4 +1,5 @@
 const { DIFFICULTY_LABELS } = require('./words');
+const subscriptionStore = require('./subscriptionStore');
 
 function registerBotHandlers(bot, gameManager) {
   bot.command('start', async (ctx) => {
@@ -7,12 +8,24 @@ function registerBotHandlers(bot, gameManager) {
     }
 
     const chatId = ctx.chat.id;
+
+    let isPremium = false;
+    if (subscriptionStore.isConfigured()) {
+      try {
+        await subscriptionStore.ensureGroup(ctx.chat);
+        const subscription = await subscriptionStore.getSubscriptionStatus(chatId);
+        isPremium = subscription.isPremium;
+      } catch (error) {
+        console.error('Failed to read group subscription from Redis:', error);
+      }
+    }
+
     const existing = gameManager.getGame(chatId);
     if (existing && existing.status !== 'finished') {
       return ctx.reply('כבר יש משחק פעיל בקבוצה הזו. אפשר לסגור אותו עם /endgame (מנהל המשחק) או לחכות שיסתיים.');
     }
 
-    const game = gameManager.createGame(chatId, ctx.from);
+    const game = gameManager.createGame(chatId, ctx.from, { isPremium });
     const sent = await ctx.reply(gameManager.lobbyText(game), {
       reply_markup: gameManager.lobbyKeyboard(game),
     });
@@ -29,6 +42,36 @@ function registerBotHandlers(bot, gameManager) {
       return ctx.reply('רק מי ששלח /start (מנהל המשחק) יכול לסגור את המשחק.');
     }
     return ctx.reply('🛑 המשחק הופסק ע"י מנהל המשחק. כדי להתחיל משחק חדש שלחו /start.');
+  });
+
+  bot.command('subscription', async (ctx) => {
+    if (!['group', 'supergroup'].includes(ctx.chat.type)) {
+      return ctx.reply('את מצב המנוי ניתן לבדוק מתוך הקבוצה.');
+    }
+
+    if (!subscriptionStore.isConfigured()) {
+      return ctx.reply('בסיס הנתונים עדיין לא הוגדר בשרת.');
+    }
+
+    try {
+      await subscriptionStore.ensureGroup(ctx.chat);
+      const status = await subscriptionStore.getSubscriptionStatus(ctx.chat.id);
+
+      if (!status.isPremium) {
+        return ctx.reply('🆓 הקבוצה משתמשת כרגע בגרסה החינמית.');
+      }
+
+      const expiry = new Intl.DateTimeFormat('he-IL', {
+        timeZone: 'Asia/Jerusalem',
+        dateStyle: 'long',
+        timeStyle: 'short',
+      }).format(status.expiresAt);
+
+      return ctx.reply(`⭐ לקבוצה יש מנוי פרימיום פעיל עד ${expiry}.`);
+    } catch (error) {
+      console.error('Failed to read subscription from Redis:', error);
+      return ctx.reply('לא הצלחנו לבדוק את מצב המנוי כרגע. נסו שוב מאוחר יותר.');
+    }
   });
 
   bot.command('players', async (ctx) => {
@@ -95,6 +138,9 @@ function registerBotHandlers(bot, gameManager) {
     const result = gameManager.cycleDifficulty(chatId, ctx.from.id);
     if (result.error === 'not_host') {
       return ctx.answerCbQuery('רק מנהל המשחק יכול לשנות את רמת הקושי.', { show_alert: true });
+    }
+    if (result.error === 'premium_required') {
+      return ctx.answerCbQuery('רמות בינוני וקשה זמינות רק לקבוצות עם מנוי פרימיום.', { show_alert: true });
     }
 
     await ctx.answerCbQuery(`רמת קושי: ${DIFFICULTY_LABELS[result.game.difficulty]}`);

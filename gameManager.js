@@ -27,13 +27,14 @@ class GameManager {
 
   // ---------- שלב הלובי ----------
 
-  createGame(chatId, host) {
+  createGame(chatId, host, { isPremium = false } = {}) {
     const game = {
       chatId,
       hostId: host.id,
       hostName: displayName(host),
       status: 'lobby', // lobby | playing | finished
-      difficulty: 'mixed',
+      difficulty: 'easy',
+      isPremium,
       players: [], // { id, name } לפי סדר הצטרפות
       lobbyMessageId: null,
       team1: [],
@@ -78,19 +79,23 @@ class GameManager {
   }
 
   lobbyKeyboard(game) {
-    return {
-      inline_keyboard: [
-        [{ text: '✋ הצטרף למשחק', callback_data: 'join' }],
-        [{ text: `🎯 קושי: ${DIFFICULTY_LABELS[game.difficulty]} (מנהל בלבד)`, callback_data: 'cycle_difficulty' }],
-        [{ text: '▶️ התחל משחק', callback_data: 'start_game' }],
-      ],
-    };
+    const rows = [[{ text: '✋ הצטרף למשחק', callback_data: 'join' }]];
+
+    if (game.isPremium) {
+      rows.push([
+        { text: `🎯 קושי: ${DIFFICULTY_LABELS[game.difficulty]} (מנהל בלבד)`, callback_data: 'cycle_difficulty' },
+      ]);
+    }
+
+    rows.push([{ text: '▶️ התחל משחק', callback_data: 'start_game' }]);
+    return { inline_keyboard: rows };
   }
 
   cycleDifficulty(chatId, requesterId) {
     const game = this.games.get(chatId);
     if (!game || game.status !== 'lobby') return { error: 'invalid_state' };
     if (requesterId !== game.hostId) return { error: 'not_host' };
+    if (!game.isPremium) return { error: 'premium_required' };
     game.difficulty = nextDifficulty(game.difficulty);
     return { ok: true, game };
   }
@@ -102,6 +107,7 @@ class GameManager {
     if (!game) return { error: 'no_game' };
     if (game.status !== 'lobby') return { error: 'already_started' };
     if (game.players.length < 4) return { error: 'not_enough_players' };
+    if (!game.isPremium) game.difficulty = 'easy';
 
     const shuffled = shuffle(game.players);
     game.team1 = [];
