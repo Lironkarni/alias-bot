@@ -1,5 +1,6 @@
 const PREMIUM_PRICE_STARS = 100;
 const SUBSCRIPTION_PERIOD_SECONDS = 30 * 24 * 60 * 60;
+const GROUP_PICKER_REQUEST_ID = 1001;
 const ACTIVE_MEMBER_STATUSES = new Set(['creator', 'administrator', 'member', 'restricted']);
 
 function registerPremiumHandlers(bot, subscriptionStore) {
@@ -27,7 +28,7 @@ function registerPremiumHandlers(bot, subscriptionStore) {
     }
 
     if (ctx.chat.type === 'private') {
-      return showPremiumMenu(ctx, subscriptionStore);
+      return showPremiumMenu(ctx);
     }
 
     if (!['group', 'supergroup'].includes(ctx.chat.type)) return;
@@ -36,8 +37,8 @@ function registerPremiumHandlers(bot, subscriptionStore) {
       await subscriptionStore.ensureGroup(ctx.chat);
       await ctx.telegram.sendMessage(
         ctx.from.id,
-        '⭐ ניהול מנוי פרימיום\n\nבחרו קבוצה כדי לראות את מצב המנוי שלה:',
-        await buildGroupsKeyboard(ctx, subscriptionStore)
+        '⭐ ניהול מנוי פרימיום\n\nלחצו על הכפתור ובחרו קבוצה שבה אתם והבוט חברים:',
+        groupPickerKeyboard()
       );
       return ctx.reply('שלחתי לך הודעה פרטית עם אפשרויות הפרימיום ✅');
     } catch (error) {
@@ -53,47 +54,24 @@ function registerPremiumHandlers(bot, subscriptionStore) {
     }
   });
 
-  bot.action(/^premium_group:(-?\d+)$/, async (ctx) => {
-    if (ctx.chat.type !== 'private') {
-      return ctx.answerCbQuery('ניהול המנוי זמין בצ׳אט הפרטי בלבד.', { show_alert: true });
-    }
+  bot.on('chat_shared', async (ctx) => {
+    if (ctx.chat.type !== 'private') return;
 
-    const chatId = ctx.match[1];
+    const shared = ctx.message.chat_shared;
+    if (!shared || shared.request_id !== GROUP_PICKER_REQUEST_ID) return;
 
     try {
-      const allowed = await userCanAccessGroup(ctx, chatId);
-      if (!allowed) {
-        return ctx.answerCbQuery('הקבוצה כבר לא זמינה עבורך.', { show_alert: true });
+      const telegramChat = await ctx.telegram.getChat(shared.chat_id);
+      if (!['group', 'supergroup'].includes(telegramChat.type)) {
+        return ctx.reply('אפשר לבחור רק קבוצה או קבוצת־על.');
       }
 
-      const status = await subscriptionStore.getSubscriptionStatus(chatId);
-      if (!status.group) {
-        return ctx.answerCbQuery('הקבוצה לא נמצאה.', { show_alert: true });
-      }
-
-      await ctx.answerCbQuery();
-
-      if (status.isPremium) {
-        return ctx.reply(
-          `⭐ לקבוצה „${status.group.title || chatId}” כבר יש מנוי פעיל.\n\nבתוקף עד: ${formatExpiry(status.expiresAt)}`
-        );
-      }
-
-      const payload = createInvoicePayload(chatId, ctx.from.id);
-      await ctx.telegram.callApi('sendInvoice', {
-        chat_id: ctx.from.id,
-        title: 'פרימיום אליאס',
-        description: `מנוי פרימיום חודשי לקבוצה „${status.group.title || chatId}”`,
-        payload,
-        provider_token: '',
-        currency: 'XTR',
-        prices: [{ label: 'מנוי חודשי', amount: PREMIUM_PRICE_STARS }],
-        subscription_period: SUBSCRIPTION_PERIOD_SECONDS,
-      });
+      const group = await subscriptionStore.ensureGroup(telegramChat);
+      await ctx.reply('הקבוצה נבחרה ✅', { reply_markup: { remove_keyboard: true } });
+      return showGroupSubscription(ctx, subscriptionStore, group);
     } catch (error) {
-      console.error('Failed to create premium invoice:', error);
-      await ctx.answerCbQuery().catch(() => {});
-      return ctx.reply('לא הצלחנו ליצור את התשלום כרגע. נסו שוב מאוחר יותר.');
+      console.error('Failed to handle selected premium group:', error);
+      return ctx.reply('לא הצלחנו לגשת לקבוצה שנבחרה. ודאו שהבוט עדיין נמצא בה.');
     }
   });
 
@@ -111,12 +89,9 @@ function registerPremiumHandlers(bot, subscriptionStore) {
     }
 
     try {
-      const allowed = await userCanAccessGroup(ctx, parsed.chatId);
-      if (!allowed) {
-        return ctx.answerPreCheckoutQuery(false, 'אין לך יותר גישה לקבוצה שנבחרה.');
-      }
-
+      await ctx.telegram.getChat(parsed.chatId);
       const status = await subscriptionStore.getSubscriptionStatus(parsed.chatId);
+
       if (!status.group) {
         return ctx.answerPreCheckoutQuery(false, 'הקבוצה לא נמצאה.');
       }
@@ -175,45 +150,55 @@ function registerPremiumHandlers(bot, subscriptionStore) {
   });
 }
 
-async function showPremiumMenu(ctx, subscriptionStore) {
-  try {
-    const keyboard = await buildGroupsKeyboard(ctx, subscriptionStore);
-    if (!keyboard.reply_markup.inline_keyboard.length) {
-      return ctx.reply(
-        'לא מצאתי קבוצות משותפות. הוסיפו את הבוט לקבוצה, הפעילו שם /start או /premium ואז נסו שוב.'
-      );
-    }
-
-    return ctx.reply('⭐ ניהול מנוי פרימיום\n\nבחרו קבוצה:', keyboard);
-  } catch (error) {
-    console.error('Failed to load premium groups:', error);
-    return ctx.reply('לא הצלחנו לטעון את הקבוצות כרגע. נסו שוב מאוחר יותר.');
-  }
+async function showPremiumMenu(ctx) {
+  return ctx.reply(
+    '⭐ ניהול מנוי פרימיום\n\nלחצו על הכפתור ובחרו קבוצה שבה אתם והבוט חברים:',
+    groupPickerKeyboard()
+  );
 }
 
-async function buildGroupsKeyboard(ctx, subscriptionStore) {
-  const groups = await subscriptionStore.listGroups();
-  const rows = [];
+async function showGroupSubscription(ctx, subscriptionStore, group) {
+  const status = await subscriptionStore.getSubscriptionStatus(group.chatId);
 
-  for (const group of groups) {
-    if (!(await userCanAccessGroup(ctx, group.chatId))) continue;
-
-    const status = await subscriptionStore.getSubscriptionStatus(group.chatId);
-    const prefix = status.isPremium ? '⭐' : '🆓';
-    const title = truncate(group.title || group.chatId, 40);
-    rows.push([{ text: `${prefix} ${title}`, callback_data: `premium_group:${group.chatId}` }]);
+  if (status.isPremium) {
+    return ctx.reply(
+      `⭐ לקבוצה „${group.title || group.chatId}” כבר יש מנוי פעיל.\n\nבתוקף עד: ${formatExpiry(status.expiresAt)}`
+    );
   }
 
-  return { reply_markup: { inline_keyboard: rows } };
+  const payload = createInvoicePayload(group.chatId, ctx.from.id);
+  return ctx.telegram.callApi('sendInvoice', {
+    chat_id: ctx.from.id,
+    title: 'פרימיום אליאס',
+    description: `מנוי פרימיום חודשי לקבוצה „${group.title || group.chatId}”`,
+    payload,
+    provider_token: '',
+    currency: 'XTR',
+    prices: [{ label: 'מנוי חודשי', amount: PREMIUM_PRICE_STARS }],
+    subscription_period: SUBSCRIPTION_PERIOD_SECONDS,
+  });
 }
 
-async function userCanAccessGroup(ctx, chatId) {
-  try {
-    const member = await ctx.telegram.getChatMember(chatId, ctx.from.id);
-    return ACTIVE_MEMBER_STATUSES.has(member.status);
-  } catch (error) {
-    return false;
-  }
+function groupPickerKeyboard() {
+  return {
+    reply_markup: {
+      keyboard: [
+        [
+          {
+            text: '👥 בחירת קבוצה',
+            request_chat: {
+              request_id: GROUP_PICKER_REQUEST_ID,
+              chat_is_channel: false,
+              bot_is_member: true,
+              request_title: true,
+            },
+          },
+        ],
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: true,
+    },
+  };
 }
 
 function createInvoicePayload(chatId, userId) {
@@ -232,10 +217,6 @@ function formatExpiry(date) {
     dateStyle: 'long',
     timeStyle: 'short',
   }).format(date);
-}
-
-function truncate(value, maxLength) {
-  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
 }
 
 module.exports = {
