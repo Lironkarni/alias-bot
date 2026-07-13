@@ -1,7 +1,11 @@
-const PREMIUM_PRICE_STARS = 100;
-const SUBSCRIPTION_PERIOD_SECONDS = 30 * 24 * 60 * 60;
 const GROUP_PICKER_REQUEST_ID = 1001;
 const ACTIVE_MEMBER_STATUSES = new Set(['creator', 'administrator', 'member', 'restricted']);
+
+const PREMIUM_PACKAGES = {
+  month: { code: 'month', label: 'חודש', price: 100, days: 30 },
+  quarter: { code: 'quarter', label: '3 חודשים', price: 200, days: 90 },
+  year: { code: 'year', label: 'שנה', price: 600, days: 365 },
+};
 
 function registerPremiumHandlers(bot, subscriptionStore) {
   bot.on('my_chat_member', async (ctx, next) => {
@@ -34,19 +38,15 @@ function registerPremiumHandlers(bot, subscriptionStore) {
     if (!['group', 'supergroup'].includes(ctx.chat.type)) return;
 
     try {
-      await subscriptionStore.ensureGroup(ctx.chat);
-      await ctx.telegram.sendMessage(
-        ctx.from.id,
-        '⭐ ניהול מנוי פרימיום\n\nלחצו על הכפתור ובחרו קבוצה שבה אתם והבוט חברים:',
-        groupPickerKeyboard()
-      );
-      return ctx.reply('שלחתי לך הודעה פרטית עם אפשרויות הפרימיום ✅');
+      const group = await subscriptionStore.ensureGroup(ctx.chat);
+      await sendPurchaseMenu(ctx.telegram, ctx.from.id, subscriptionStore, group);
+      return ctx.reply('שלחתי לך בפרטי את תפריט הפרימיום של הקבוצה ✅');
     } catch (error) {
-      console.error('Failed to open premium menu in private chat:', error);
+      console.error('Failed to send group premium menu privately:', error);
       const username = ctx.botInfo && ctx.botInfo.username;
       if (!username) return ctx.reply('פתחו קודם שיחה פרטית עם הבוט ואז נסו שוב.');
 
-      return ctx.reply('כדי לנהל מנוי צריך לפתוח קודם שיחה פרטית עם הבוט:', {
+      return ctx.reply('כדי לרכוש פרימיום צריך לפתוח קודם שיחה פרטית עם הבוט:', {
         reply_markup: {
           inline_keyboard: [[{ text: '⭐ פתיחת ניהול פרימיום', url: `https://t.me/${username}?start=premium` }]],
         },
@@ -68,7 +68,7 @@ function registerPremiumHandlers(bot, subscriptionStore) {
 
       const group = await subscriptionStore.ensureGroup(telegramChat);
       await ctx.reply('הקבוצה נבחרה ✅', { reply_markup: { remove_keyboard: true } });
-      return await showGroupSubscription(ctx, subscriptionStore, group);
+      return await sendPurchaseMenu(ctx.telegram, ctx.from.id, subscriptionStore, group);
     } catch (error) {
       console.error('Failed to handle selected premium group:', error);
       return ctx.reply('לא הצלחנו לגשת לקבוצה שנבחרה. ודאו שהבוט עדיין נמצא בה.');
@@ -78,12 +78,14 @@ function registerPremiumHandlers(bot, subscriptionStore) {
   bot.on('pre_checkout_query', async (ctx) => {
     const query = ctx.preCheckoutQuery;
     const parsed = parseInvoicePayload(query.invoice_payload);
+    const selectedPackage = parsed && PREMIUM_PACKAGES[parsed.packageCode];
 
     if (
       !parsed ||
+      !selectedPackage ||
       String(query.from.id) !== parsed.userId ||
       query.currency !== 'XTR' ||
-      query.total_amount !== PREMIUM_PRICE_STARS
+      query.total_amount !== selectedPackage.price
     ) {
       return ctx.answerPreCheckoutQuery(false, 'פרטי התשלום אינם תקינים.');
     }
@@ -109,38 +111,37 @@ function registerPremiumHandlers(bot, subscriptionStore) {
   bot.on('successful_payment', async (ctx) => {
     const payment = ctx.message.successful_payment;
     const parsed = parseInvoicePayload(payment.invoice_payload);
+    const selectedPackage = parsed && PREMIUM_PACKAGES[parsed.packageCode];
 
     if (
       !parsed ||
+      !selectedPackage ||
       String(ctx.from.id) !== parsed.userId ||
       payment.currency !== 'XTR' ||
-      payment.total_amount !== PREMIUM_PRICE_STARS
+      payment.total_amount !== selectedPackage.price
     ) {
       console.error('Ignoring invalid successful premium payment payload');
       return;
     }
 
     try {
-      const expiresAt = payment.subscription_expiration_date
-        ? new Date(payment.subscription_expiration_date * 1000)
-        : new Date(Date.now() + SUBSCRIPTION_PERIOD_SECONDS * 1000);
-
+      const expiresAt = new Date(Date.now() + selectedPackage.days * 24 * 60 * 60 * 1000);
       const group = await subscriptionStore.activateSubscription({
         chatId: parsed.chatId,
         expiresAt,
         activatedBy: ctx.from.id,
         telegramPaymentChargeId: payment.telegram_payment_charge_id,
-        isRecurring: Boolean(payment.is_recurring),
+        isRecurring: false,
       });
 
       await ctx.reply(
-        `✅ התשלום התקבל!\n\nהמנוי לקבוצה „${group.title || parsed.chatId}” פעיל עד ${formatExpiry(expiresAt)}.`
+        `✅ התשלום התקבל!\n\nחבילת ${selectedPackage.label} לקבוצה „${group.title || parsed.chatId}” פעילה עד ${formatExpiry(expiresAt)}.`
       );
 
       await ctx.telegram
         .sendMessage(
           parsed.chatId,
-          `⭐ מנוי הפרימיום של הקבוצה הופעל בהצלחה!\nבתוקף עד: ${formatExpiry(expiresAt)}`
+          `⭐ מנוי הפרימיום של הקבוצה הופעל בהצלחה!\nחבילה: ${selectedPackage.label}\nבתוקף עד: ${formatExpiry(expiresAt)}`
         )
         .catch(() => {});
     } catch (error) {
@@ -157,34 +158,48 @@ async function showPremiumMenu(ctx) {
   );
 }
 
-async function showGroupSubscription(ctx, subscriptionStore, group) {
+async function sendPurchaseMenu(telegram, userId, subscriptionStore, group) {
   const status = await subscriptionStore.getSubscriptionStatus(group.chatId);
 
   if (status.isPremium) {
-    return ctx.reply(
+    return telegram.sendMessage(
+      userId,
       `⭐ לקבוצה „${group.title || group.chatId}” כבר יש מנוי פעיל.\n\nבתוקף עד: ${formatExpiry(status.expiresAt)}`
     );
   }
 
-  const payload = createInvoicePayload(group.chatId, ctx.from.id);
-  const invoiceLink = await ctx.telegram.callApi('createInvoiceLink', {
-    title: 'פרימיום אליאס',
-    description: `מנוי פרימיום חודשי לקבוצה „${group.title || group.chatId}”`,
-    payload,
-    provider_token: '',
-    currency: 'XTR',
-    prices: [{ label: 'מנוי חודשי', amount: PREMIUM_PRICE_STARS }],
-    subscription_period: SUBSCRIPTION_PERIOD_SECONDS,
-  });
-
-  return ctx.reply(
-    `⭐ פרימיום לקבוצה „${group.title || group.chatId}”\n\n100 כוכבים בכל 30 יום. המנוי מתחדש אוטומטית.`,
-    {
-      reply_markup: {
-        inline_keyboard: [[{ text: '⭐ רכישת מנוי — 100 כוכבים', url: invoiceLink }]],
-      },
-    }
+  const packageLinks = await Promise.all(
+    Object.values(PREMIUM_PACKAGES).map(async (item) => {
+      const payload = createInvoicePayload(group.chatId, userId, item.code);
+      const url = await telegram.callApi('createInvoiceLink', {
+        title: 'פרימיום אליאס',
+        description: `חבילת ${item.label} לקבוצה „${group.title || group.chatId}”`,
+        payload,
+        provider_token: '',
+        currency: 'XTR',
+        prices: [{ label: `פרימיום — ${item.label}`, amount: item.price }],
+      });
+      return { item, url };
+    })
   );
+
+  const text =
+    `⭐ פרימיום אליאס לקבוצה „${group.title || group.chatId}”\n\n` +
+    'מה מקבלים?\n' +
+    '✅ גישה למאגר המילים המלא\n' +
+    '✅ רמות קושי בינוני וקשה\n' +
+    '✅ מילים מאתגרות ומגוונות יותר\n' +
+    '✅ פחות חזרות בין משחקים\n' +
+    '✅ הפרימיום זמין לכל חברי הקבוצה\n\n' +
+    'בחרו חבילה:';
+
+  return telegram.sendMessage(userId, text, {
+    reply_markup: {
+      inline_keyboard: packageLinks.map(({ item, url }) => [
+        { text: `⭐ ${item.label} — ${item.price}`, url },
+      ]),
+    },
+  });
 }
 
 function groupPickerKeyboard() {
@@ -209,14 +224,14 @@ function groupPickerKeyboard() {
   };
 }
 
-function createInvoicePayload(chatId, userId) {
-  return `premium:${String(chatId)}:${String(userId)}`;
+function createInvoicePayload(chatId, userId, packageCode) {
+  return `premium:${String(chatId)}:${String(userId)}:${packageCode}`;
 }
 
 function parseInvoicePayload(payload) {
-  const match = /^premium:(-?\d+):(\d+)$/.exec(payload || '');
+  const match = /^premium:(-?\d+):(\d+):(month|quarter|year)$/.exec(payload || '');
   if (!match) return null;
-  return { chatId: match[1], userId: match[2] };
+  return { chatId: match[1], userId: match[2], packageCode: match[3] };
 }
 
 function formatExpiry(date) {
@@ -228,8 +243,10 @@ function formatExpiry(date) {
 }
 
 module.exports = {
+  PREMIUM_PACKAGES,
   registerPremiumHandlers,
   showPremiumMenu,
+  sendPurchaseMenu,
   createInvoicePayload,
   parseInvoicePayload,
 };
