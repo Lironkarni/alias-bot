@@ -3,6 +3,24 @@ const SUBSCRIPTION_PERIOD_SECONDS = 30 * 24 * 60 * 60;
 const ACTIVE_MEMBER_STATUSES = new Set(['creator', 'administrator', 'member', 'restricted']);
 
 function registerPremiumHandlers(bot, subscriptionStore) {
+  bot.on('my_chat_member', async (ctx, next) => {
+    const chat = ctx.myChatMember && ctx.myChatMember.chat;
+    const status = ctx.myChatMember && ctx.myChatMember.new_chat_member.status;
+
+    if (
+      chat &&
+      ['group', 'supergroup'].includes(chat.type) &&
+      ACTIVE_MEMBER_STATUSES.has(status) &&
+      subscriptionStore.isConfigured()
+    ) {
+      await subscriptionStore.ensureGroup(chat).catch((error) => {
+        console.error('Failed to register group after bot membership update:', error);
+      });
+    }
+
+    return next();
+  });
+
   bot.command('premium', async (ctx) => {
     if (!subscriptionStore.isConfigured()) {
       return ctx.reply('בסיס הנתונים עדיין לא הוגדר בשרת.');
