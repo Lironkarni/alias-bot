@@ -131,6 +131,8 @@ function registerPremiumHandlers(bot, subscriptionStore) {
         expiresAt,
         activatedBy: ctx.from.id,
         telegramPaymentChargeId: payment.telegram_payment_charge_id,
+        packageCode: selectedPackage.code,
+        paidStars: selectedPackage.price,
         isRecurring: false,
       });
 
