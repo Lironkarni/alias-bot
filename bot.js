@@ -9,11 +9,14 @@ function registerBotHandlers(bot, gameManager) {
 
     const chatId = ctx.chat.id;
 
+    let isPremium = false;
     if (subscriptionStore.isConfigured()) {
       try {
         await subscriptionStore.ensureGroup(ctx.chat);
+        const subscription = await subscriptionStore.getSubscriptionStatus(chatId);
+        isPremium = subscription.isPremium;
       } catch (error) {
-        console.error('Failed to save group in Redis:', error);
+        console.error('Failed to read group subscription from Redis:', error);
       }
     }
 
@@ -22,7 +25,7 @@ function registerBotHandlers(bot, gameManager) {
       return ctx.reply('כבר יש משחק פעיל בקבוצה הזו. אפשר לסגור אותו עם /endgame (מנהל המשחק) או לחכות שיסתיים.');
     }
 
-    const game = gameManager.createGame(chatId, ctx.from);
+    const game = gameManager.createGame(chatId, ctx.from, { isPremium });
     const sent = await ctx.reply(gameManager.lobbyText(game), {
       reply_markup: gameManager.lobbyKeyboard(game),
     });
@@ -135,6 +138,9 @@ function registerBotHandlers(bot, gameManager) {
     const result = gameManager.cycleDifficulty(chatId, ctx.from.id);
     if (result.error === 'not_host') {
       return ctx.answerCbQuery('רק מנהל המשחק יכול לשנות את רמת הקושי.', { show_alert: true });
+    }
+    if (result.error === 'premium_required') {
+      return ctx.answerCbQuery('רמות בינוני וקשה זמינות רק לקבוצות עם מנוי פרימיום.', { show_alert: true });
     }
 
     await ctx.answerCbQuery(`רמת קושי: ${DIFFICULTY_LABELS[result.game.difficulty]}`);
