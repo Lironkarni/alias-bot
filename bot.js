@@ -1,4 +1,5 @@
 const { DIFFICULTY_LABELS } = require('./words');
+const subscriptionStore = require('./subscriptionStore');
 
 function registerBotHandlers(bot, gameManager) {
   bot.command('start', async (ctx) => {
@@ -7,6 +8,15 @@ function registerBotHandlers(bot, gameManager) {
     }
 
     const chatId = ctx.chat.id;
+
+    if (subscriptionStore.isConfigured()) {
+      try {
+        await subscriptionStore.ensureGroup(ctx.chat);
+      } catch (error) {
+        console.error('Failed to save group in Redis:', error);
+      }
+    }
+
     const existing = gameManager.getGame(chatId);
     if (existing && existing.status !== 'finished') {
       return ctx.reply('כבר יש משחק פעיל בקבוצה הזו. אפשר לסגור אותו עם /endgame (מנהל המשחק) או לחכות שיסתיים.');
@@ -29,6 +39,36 @@ function registerBotHandlers(bot, gameManager) {
       return ctx.reply('רק מי ששלח /start (מנהל המשחק) יכול לסגור את המשחק.');
     }
     return ctx.reply('🛑 המשחק הופסק ע"י מנהל המשחק. כדי להתחיל משחק חדש שלחו /start.');
+  });
+
+  bot.command('subscription', async (ctx) => {
+    if (!['group', 'supergroup'].includes(ctx.chat.type)) {
+      return ctx.reply('את מצב המנוי ניתן לבדוק מתוך הקבוצה.');
+    }
+
+    if (!subscriptionStore.isConfigured()) {
+      return ctx.reply('בסיס הנתונים עדיין לא הוגדר בשרת.');
+    }
+
+    try {
+      await subscriptionStore.ensureGroup(ctx.chat);
+      const status = await subscriptionStore.getSubscriptionStatus(ctx.chat.id);
+
+      if (!status.isPremium) {
+        return ctx.reply('🆓 הקבוצה משתמשת כרגע בגרסה החינמית.');
+      }
+
+      const expiry = new Intl.DateTimeFormat('he-IL', {
+        timeZone: 'Asia/Jerusalem',
+        dateStyle: 'long',
+        timeStyle: 'short',
+      }).format(status.expiresAt);
+
+      return ctx.reply(`⭐ לקבוצה יש מנוי פרימיום פעיל עד ${expiry}.`);
+    } catch (error) {
+      console.error('Failed to read subscription from Redis:', error);
+      return ctx.reply('לא הצלחנו לבדוק את מצב המנוי כרגע. נסו שוב מאוחר יותר.');
+    }
   });
 
   bot.command('players', async (ctx) => {
