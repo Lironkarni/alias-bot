@@ -111,6 +111,8 @@ async function activateSubscription({
   expiresAt,
   activatedBy,
   telegramPaymentChargeId,
+  packageCode = null,
+  paidStars = null,
   isRecurring = true,
 }) {
   const existing = await getGroup(chatId);
@@ -133,6 +135,8 @@ async function activateSubscription({
     subscriptionStatus: expiry.getTime() > Date.now() ? 'premium' : 'free',
     activatedBy: String(activatedBy),
     telegramPaymentChargeId,
+    packageCode,
+    paidStars,
     isRecurring: Boolean(isRecurring),
     lastPaymentAt: new Date().toISOString(),
   });
