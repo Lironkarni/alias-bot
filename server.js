@@ -92,6 +92,16 @@ io.on('connection', (socket) => {
 async function start() {
   server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
+  await bot.telegram
+    .setMyCommands([
+      { command: 'start', description: 'פתיחת משחק חדש בקבוצה' },
+      { command: 'join', description: 'הצטרפות למשחק פעיל' },
+      { command: 'players', description: 'הצגת משתתפי המשחק' },
+      { command: 'endgame', description: 'סגירת המשחק' },
+      { command: 'premium', description: 'ניהול מנוי פרימיום' },
+    ])
+    .catch((error) => console.error('Failed to update bot commands:', error));
+
   if (USE_WEBHOOK) {
     if (!PUBLIC_URL) {
       console.error('USE_WEBHOOK=true אבל לא הוגדר PUBLIC_URL');
