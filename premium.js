@@ -68,7 +68,7 @@ function registerPremiumHandlers(bot, subscriptionStore) {
 
       const group = await subscriptionStore.ensureGroup(telegramChat);
       await ctx.reply('הקבוצה נבחרה ✅', { reply_markup: { remove_keyboard: true } });
-      return showGroupSubscription(ctx, subscriptionStore, group);
+      return await showGroupSubscription(ctx, subscriptionStore, group);
     } catch (error) {
       console.error('Failed to handle selected premium group:', error);
       return ctx.reply('לא הצלחנו לגשת לקבוצה שנבחרה. ודאו שהבוט עדיין נמצא בה.');
@@ -167,8 +167,7 @@ async function showGroupSubscription(ctx, subscriptionStore, group) {
   }
 
   const payload = createInvoicePayload(group.chatId, ctx.from.id);
-  return ctx.telegram.callApi('sendInvoice', {
-    chat_id: ctx.from.id,
+  const invoiceLink = await ctx.telegram.callApi('createInvoiceLink', {
     title: 'פרימיום אליאס',
     description: `מנוי פרימיום חודשי לקבוצה „${group.title || group.chatId}”`,
     payload,
@@ -177,6 +176,15 @@ async function showGroupSubscription(ctx, subscriptionStore, group) {
     prices: [{ label: 'מנוי חודשי', amount: PREMIUM_PRICE_STARS }],
     subscription_period: SUBSCRIPTION_PERIOD_SECONDS,
   });
+
+  return ctx.reply(
+    `⭐ פרימיום לקבוצה „${group.title || group.chatId}”\n\n100 כוכבים בכל 30 יום. המנוי מתחדש אוטומטית.`,
+    {
+      reply_markup: {
+        inline_keyboard: [[{ text: '⭐ רכישת מנוי — 100 כוכבים', url: invoiceLink }]],
+      },
+    }
+  );
 }
 
 function groupPickerKeyboard() {
