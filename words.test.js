@@ -52,3 +52,23 @@ test('new no-obvious-opposite words are available only in premium pools', () => 
     assert.ok(HARD_WORDS.includes(word), `missing premium hard word: ${word}`);
   }
 });
+
+test('premium expansion adds at least 100 net new words to every difficulty', () => {
+  // Baseline before this expansion: 710 easy, 625 medium, 233 hard.
+  assert.ok(PREMIUM_EASY_WORDS.length >= 810);
+  assert.ok(MEDIUM_WORDS.length >= 725);
+  assert.ok(HARD_WORDS.length >= 333);
+
+  for (const word of ['אבזם', 'אקורדיון', 'דחליל', 'מפוחית', 'פיניאטה', 'רוגטקה']) {
+    assert.ok(PREMIUM_EASY_WORDS.includes(word), `missing expanded easy word: ${word}`);
+    assert.ok(!WORDS.includes(word), `expanded premium word leaked into free pool: ${word}`);
+  }
+
+  for (const word of ['אבן דרך', 'דלת סתרים', 'חוק מרפי', 'עולם מקביל', 'קיר אש']) {
+    assert.ok(MEDIUM_WORDS.includes(word), `missing expanded medium word: ${word}`);
+  }
+
+  for (const word of ['אקזיסטנציאליזם', 'דמגוגיה', 'כשל המהמר', 'פרדיגמה', 'דילמת האסיר']) {
+    assert.ok(HARD_WORDS.includes(word), `missing expanded hard word: ${word}`);
+  }
+});
