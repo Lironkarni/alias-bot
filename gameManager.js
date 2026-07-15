@@ -4,6 +4,7 @@ const { getWordPool, nextDifficulty, DIFFICULTY_LABELS } = require('./words');
 const TURN_SECONDS = 60;
 const WIN_SCORE = 30;
 const TURN_TOKEN_TTL_MS = 10 * 60 * 1000; // 10 דקות לפתוח את הקישור
+const PREMIUM_PROMOTION_INTERVAL = 3;
 
 class GameManager {
   /**
@@ -19,6 +20,7 @@ class GameManager {
 
     this.games = new Map(); // chatId -> game state
     this.turnTokens = new Map(); // token -> { chatId, expectedUserId }
+    this.freeGamesCompleted = new Map(); // chatId -> completed free games in this process
   }
 
   getGame(chatId) {
@@ -316,7 +318,7 @@ class GameManager {
   }
 
   _pickWord(game) {
-    const pool = getWordPool(game.difficulty);
+    const pool = getWordPool(game.difficulty, game.isPremium);
     const available = pool.filter((w) => !game.usedWords.has(w));
     const source = available.length > 0 ? available : pool; // אם נגמרו המילים, מתחילים סבב חדש
     if (available.length === 0) game.usedWords.clear();
@@ -429,6 +431,18 @@ class GameManager {
         `🔴 קבוצה 2: ${game.scores.team2} נקודות\n\n` +
         `כדי לשחק שוב, שלחו /start`
     );
+
+    if (!game.isPremium) {
+      const completed = (this.freeGamesCompleted.get(game.chatId) || 0) + 1;
+      this.freeGamesCompleted.set(game.chatId, completed);
+
+      if (completed % PREMIUM_PROMOTION_INTERVAL === 0) {
+        await this.bot.telegram.sendMessage(
+          game.chatId,
+          '⭐ נהנים מאליאס?\nבפרימיום מחכים לכם מאגר מילים מורחב, מילים חדשות ורמות קושי בינוני וקשה.\nלפרטים ורכישה: /premium'
+        );
+      }
+    }
     this.games.delete(game.chatId);
   }
 }
