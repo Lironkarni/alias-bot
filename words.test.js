@@ -1,23 +1,31 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { WORDS, MEDIUM_WORDS, HARD_WORDS } = require('./words');
+const { WORDS, PREMIUM_EASY_WORDS, MEDIUM_WORDS, HARD_WORDS, getWordPool } = require('./words');
 
 test('each difficulty contains only unique words', () => {
-  for (const pool of [WORDS, MEDIUM_WORDS, HARD_WORDS]) {
+  for (const pool of [WORDS, PREMIUM_EASY_WORDS, MEDIUM_WORDS, HARD_WORDS]) {
     assert.equal(pool.length, new Set(pool).size);
   }
 });
 
 test('words do not overlap between difficulty levels', () => {
-  const allWords = [...WORDS, ...MEDIUM_WORDS, ...HARD_WORDS];
+  const allWords = [...PREMIUM_EASY_WORDS, ...MEDIUM_WORDS, ...HARD_WORDS];
   assert.equal(allWords.length, new Set(allWords).size);
 });
 
 test('expanded pools contain a useful amount of content', () => {
-  assert.ok(WORDS.length >= 600);
-  assert.ok(MEDIUM_WORDS.length >= 550);
-  assert.ok(HARD_WORDS.length >= 165);
+  assert.equal(WORDS.length, 500);
+  assert.ok(PREMIUM_EASY_WORDS.length > WORDS.length);
+  assert.ok(MEDIUM_WORDS.length >= 600);
+  assert.ok(HARD_WORDS.length >= 220);
+});
+
+test('free groups get exactly 500 easy words while premium gets the expanded easy pool', () => {
+  assert.equal(getWordPool('easy', false), WORDS);
+  assert.equal(getWordPool('easy', true), PREMIUM_EASY_WORDS);
+  assert.equal(getWordPool('medium', true), MEDIUM_WORDS);
+  assert.equal(getWordPool('hard', true), HARD_WORDS);
 });
 
 test('requested batch is assigned to medium without duplicating basic words', () => {
