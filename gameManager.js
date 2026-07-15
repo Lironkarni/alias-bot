@@ -67,7 +67,8 @@ class GameManager {
   }
 
   lobbyText(game) {
-    const lines = ['🎭 ברוכים הבאים למשחק אליאס!', ''];
+    const title = game.isPremium ? '⭐ ברוכים הבאים לאליאס פרימיום!' : '🎭 ברוכים הבאים למשחק אליאס!';
+    const lines = [title, ''];
     if (game.players.length === 0) {
       lines.push('אף אחד עוד לא הצטרף.');
     } else {
@@ -131,7 +132,8 @@ class GameManager {
   teamsText(game) {
     const t1 = game.team1.map((p) => p.name).join(', ');
     const t2 = game.team2.map((p) => p.name).join(', ');
-    return `🎭 המשחק מתחיל! (קושי: ${DIFFICULTY_LABELS[game.difficulty]})\n\n🔵 קבוצה 1: ${t1}\n🔴 קבוצה 2: ${t2}`;
+    const title = game.isPremium ? '⭐ אליאס פרימיום מתחיל!' : '🎭 המשחק מתחיל!';
+    return `${title} (קושי: ${DIFFICULTY_LABELS[game.difficulty]})\n\n🔵 קבוצה 1: ${t1}\n🔴 קבוצה 2: ${t2}`;
   }
 
   // ---------- ניהול שחקנים ----------
@@ -272,7 +274,9 @@ class GameManager {
     game.turnWords = [];
 
     const teamEmoji = game.currentTeam === 1 ? '🔵' : '🔴';
+    const premiumTitle = game.isPremium ? '⭐ אליאס פרימיום\n' : '';
     const text =
+      premiumTitle +
       `${teamEmoji} התור של קבוצה ${game.currentTeam}\n` +
       `🎤 המסביר: ${player.name}\n\n` +
       `לחצו על הכפתור כדי לפתוח את מסך המשחק.\n` +
@@ -426,7 +430,7 @@ class GameManager {
     const emoji = winner === 1 ? '🔵' : '🔴';
     await this.bot.telegram.sendMessage(
       game.chatId,
-      `🏆 קבוצה ${winner} ניצחה! ${emoji}\n\n` +
+      `${game.isPremium ? '⭐ אליאס פרימיום\n' : ''}🏆 קבוצה ${winner} ניצחה! ${emoji}\n\n` +
         `🔵 קבוצה 1: ${game.scores.team1} נקודות\n` +
         `🔴 קבוצה 2: ${game.scores.team2} נקודות\n\n` +
         `כדי לשחק שוב, שלחו /start`
