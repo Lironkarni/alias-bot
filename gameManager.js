@@ -224,10 +224,10 @@ class GameManager {
 
   // ---------- סגירת משחק ----------
 
-  closeGame(chatId, requesterId) {
+  closeGame(chatId, requesterId, { isGroupAdmin = false } = {}) {
     const game = this.games.get(chatId);
     if (!game) return { error: 'no_game' };
-    if (requesterId !== game.hostId) return { error: 'not_host' };
+    if (requesterId !== game.hostId && !isGroupAdmin) return { error: 'not_host' };
 
     clearTimeout(game.turnTimeout);
     if (game.currentTurnToken) {

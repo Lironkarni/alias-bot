@@ -28,7 +28,7 @@ function registerBotHandlers(bot, gameManager) {
 
     const existing = gameManager.getGame(chatId);
     if (existing && existing.status !== 'finished') {
-      return ctx.reply('כבר יש משחק פעיל בקבוצה הזו. אפשר לסגור אותו עם /endgame (מנהל המשחק) או לחכות שיסתיים.');
+      return ctx.reply('כבר יש משחק פעיל בקבוצה הזו. מנהל המשחק או מנהלי הקבוצה יכולים לסגור אותו עם /endgame.');
     }
 
     const game = gameManager.createGame(chatId, ctx.from, { isPremium });
@@ -43,11 +43,22 @@ function registerBotHandlers(bot, gameManager) {
     const game = gameManager.getGame(chatId);
     if (!game) return ctx.reply('אין משחק פעיל כרגע.');
 
-    const result = gameManager.closeGame(chatId, ctx.from.id);
-    if (result.error === 'not_host') {
-      return ctx.reply('רק מי ששלח /start (מנהל המשחק) יכול לסגור את המשחק.');
+    let isGroupAdmin = Boolean(ctx.message && ctx.message.sender_chat && ctx.message.sender_chat.id === chatId);
+
+    if (!isGroupAdmin && ctx.from.id !== game.hostId && ['group', 'supergroup'].includes(ctx.chat.type)) {
+      try {
+        const member = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+        isGroupAdmin = ['creator', 'administrator'].includes(member.status);
+      } catch (error) {
+        console.error('Failed to verify group admin for /endgame:', error);
+      }
     }
-    return ctx.reply('🛑 המשחק הופסק ע"י מנהל המשחק. כדי להתחיל משחק חדש שלחו /start.');
+
+    const result = gameManager.closeGame(chatId, ctx.from.id, { isGroupAdmin });
+    if (result.error === 'not_host') {
+      return ctx.reply('רק מי שפתח את המשחק או מנהל הקבוצה יכול לסגור אותו.');
+    }
+    return ctx.reply('🛑 המשחק הופסק. כדי להתחיל משחק חדש שלחו /start.');
   });
 
   bot.command('players', async (ctx) => {
