@@ -37,3 +37,18 @@ test('requested batch is assigned to medium without duplicating basic words', ()
     assert.ok(!MEDIUM_WORDS.includes(duplicate), `duplicate leaked into medium: ${duplicate}`);
   }
 });
+
+test('new no-obvious-opposite words are available only in premium pools', () => {
+  for (const word of ['חמסה', 'חצוצרה', 'כינור', 'צוללת']) {
+    assert.ok(PREMIUM_EASY_WORDS.includes(word), `missing premium easy word: ${word}`);
+    assert.ok(!WORDS.includes(word), `premium easy word leaked into free pool: ${word}`);
+  }
+
+  for (const word of ['בומרנג', 'דיבוב', 'הולוגרמה', 'היפנוזה', 'טלפתיה', 'רובוטיקה']) {
+    assert.ok(MEDIUM_WORDS.includes(word), `missing premium medium word: ${word}`);
+  }
+
+  for (const word of ['אבסורד', 'אפקט פלסבו', 'פרדוקס', 'תורת הכאוס', 'קניין רוחני']) {
+    assert.ok(HARD_WORDS.includes(word), `missing premium hard word: ${word}`);
+  }
+});
