@@ -37,6 +37,7 @@ class GameManager {
       status: 'lobby', // lobby | playing | finished
       difficulty: 'easy',
       isPremium,
+      skipPenaltyEnabled: false,
       players: [], // { id, name } לפי סדר הצטרפות
       lobbyMessageId: null,
       team1: [],
@@ -45,6 +46,8 @@ class GameManager {
       team2Idx: 0,
       currentTeam: 1,
       scores: { team1: 0, team2: 0 },
+      completedTurns: { team1: 0, team2: 0 },
+      isOvertime: false,
       currentTurnToken: null,
       currentPlayer: null,
       turnActive: false,
@@ -77,6 +80,9 @@ class GameManager {
     }
     lines.push('');
     lines.push(`🎯 רמת קושי: ${DIFFICULTY_LABELS[game.difficulty]}`);
+    if (game.isPremium) {
+      lines.push(`⏭ קנס על דילוג: ${game.skipPenaltyEnabled ? 'פעיל (מוריד נקודה)' : 'כבוי'}`);
+    }
     lines.push(`מנהל המשחק: ${game.hostName}`);
     return lines.join('\n');
   }
@@ -87,6 +93,12 @@ class GameManager {
     if (game.isPremium) {
       rows.push([
         { text: `🎯 קושי: ${DIFFICULTY_LABELS[game.difficulty]} (מנהל בלבד)`, callback_data: 'cycle_difficulty' },
+      ]);
+      rows.push([
+        {
+          text: `⏭ קנס דילוג: ${game.skipPenaltyEnabled ? 'פעיל' : 'כבוי'} (מנהל בלבד)`,
+          callback_data: 'toggle_skip_penalty',
+        },
       ]);
     }
 
@@ -103,6 +115,15 @@ class GameManager {
     return { ok: true, game };
   }
 
+  toggleSkipPenalty(chatId, requesterId) {
+    const game = this.games.get(chatId);
+    if (!game || game.status !== 'lobby') return { error: 'invalid_state' };
+    if (requesterId !== game.hostId) return { error: 'not_host' };
+    if (!game.isPremium) return { error: 'premium_required' };
+    game.skipPenaltyEnabled = !game.skipPenaltyEnabled;
+    return { ok: true, game };
+  }
+
   // ---------- התחלת משחק וחלוקה לקבוצות ----------
 
   startGame(chatId) {
@@ -110,7 +131,10 @@ class GameManager {
     if (!game) return { error: 'no_game' };
     if (game.status !== 'lobby') return { error: 'already_started' };
     if (game.players.length < 4) return { error: 'not_enough_players' };
-    if (!game.isPremium) game.difficulty = 'easy';
+    if (!game.isPremium) {
+      game.difficulty = 'easy';
+      game.skipPenaltyEnabled = false;
+    }
 
     const shuffled = shuffle(game.players);
     game.team1 = [];
@@ -125,6 +149,8 @@ class GameManager {
     game.team1Idx = 0;
     game.team2Idx = 0;
     game.scores = { team1: 0, team2: 0 };
+    game.completedTurns = { team1: 0, team2: 0 };
+    game.isOvertime = false;
 
     return { game };
   }
@@ -133,7 +159,10 @@ class GameManager {
     const t1 = game.team1.map((p) => p.name).join(', ');
     const t2 = game.team2.map((p) => p.name).join(', ');
     const title = game.isPremium ? '⭐ אליאס פרימיום מתחיל!' : '🎭 המשחק מתחיל!';
-    return `${title} (קושי: ${DIFFICULTY_LABELS[game.difficulty]})\n\n🔵 קבוצה 1: ${t1}\n🔴 קבוצה 2: ${t2}`;
+    const skipMode = game.isPremium
+      ? `\n⏭ קנס על דילוג: ${game.skipPenaltyEnabled ? 'פעיל' : 'כבוי'}`
+      : '';
+    return `${title} (קושי: ${DIFFICULTY_LABELS[game.difficulty]})${skipMode}\n\n🔵 קבוצה 1: ${t1}\n🔴 קבוצה 2: ${t2}`;
   }
 
   // ---------- ניהול שחקנים ----------
@@ -342,6 +371,7 @@ class GameManager {
   handleSkip(game) {
     if (!game.turnActive) return null;
     if (game.currentWord) game.turnWords.push({ word: game.currentWord, result: 'skipped' });
+    if (game.skipPenaltyEnabled) game.turnScore = Math.max(0, game.turnScore - 1);
     game.currentWord = this._pickWord(game);
     return { word: game.currentWord, turnScore: game.turnScore };
   }
@@ -373,6 +403,8 @@ class GameManager {
     const gained = game.turnScore;
     if (team === 1) game.scores.team1 += gained;
     else game.scores.team2 += gained;
+    const teamKey = team === 1 ? 'team1' : 'team2';
+    game.completedTurns[teamKey] += 1;
 
     this.io.to(game.currentTurnToken).emit('turn_ended', { turnScore: gained, reason });
     this.turnTokens.delete(game.currentTurnToken);
@@ -393,9 +425,18 @@ class GameManager {
         .join('\n')
     );
 
-    if (game.scores.team1 >= WIN_SCORE || game.scores.team2 >= WIN_SCORE) {
-      await this._finishGame(game);
+    const outcome = this._getGameOutcome(game);
+    if (outcome && outcome.winner) {
+      await this._finishGame(game, outcome.winner);
       return;
+    }
+
+    if (outcome && outcome.overtime) {
+      game.isOvertime = true;
+      await this.bot.telegram.sendMessage(
+        chatId,
+        '⚔️ שוויון לאחר מספר תורים שווה!\nכל קבוצה תקבל תור נוסף. ההארכה תימשך עד שיהיה מנצח.'
+      );
     }
 
     // קידום התור: אם עכשיו סיימה קבוצה 2 - עוברים לשחקן הבא בשתי הקבוצות
@@ -424,9 +465,18 @@ class GameManager {
     return lines.join('\n');
   }
 
-  async _finishGame(game) {
+  _getGameOutcome(game) {
+    const turnsAreEqual = game.completedTurns.team1 === game.completedTurns.team2;
+    if (!turnsAreEqual) return null;
+
+    const { team1, team2 } = game.scores;
+    if (Math.max(team1, team2) < WIN_SCORE) return null;
+    if (team1 === team2) return { overtime: true };
+    return { winner: team1 > team2 ? 1 : 2 };
+  }
+
+  async _finishGame(game, winner) {
     game.status = 'finished';
-    const winner = game.scores.team1 >= WIN_SCORE ? 1 : 2;
     const emoji = winner === 1 ? '🔵' : '🔴';
     await this.bot.telegram.sendMessage(
       game.chatId,
