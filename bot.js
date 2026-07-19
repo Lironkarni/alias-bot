@@ -140,6 +140,31 @@ function registerBotHandlers(bot, gameManager) {
     }
   });
 
+  bot.action('toggle_skip_penalty', async (ctx) => {
+    const chatId = ctx.chat.id;
+    const game = gameManager.getGame(chatId);
+    if (!game || game.status !== 'lobby') {
+      return ctx.answerCbQuery('אי אפשר לשנות את מצב הדילוג כרגע.', { show_alert: true });
+    }
+
+    const result = gameManager.toggleSkipPenalty(chatId, ctx.from.id);
+    if (result.error === 'not_host') {
+      return ctx.answerCbQuery('רק מנהל המשחק יכול לשנות את מצב הדילוג.', { show_alert: true });
+    }
+    if (result.error === 'premium_required') {
+      return ctx.answerCbQuery('מצב קנס על דילוג זמין רק לקבוצות עם מנוי פרימיום.', { show_alert: true });
+    }
+
+    await ctx.answerCbQuery(`קנס על דילוג: ${result.game.skipPenaltyEnabled ? 'פעיל' : 'כבוי'}`);
+    try {
+      await ctx.telegram.editMessageText(chatId, game.lobbyMessageId, undefined, gameManager.lobbyText(game), {
+        reply_markup: gameManager.lobbyKeyboard(game),
+      });
+    } catch (e) {
+      // לא נורא
+    }
+  });
+
   bot.action('start_game', async (ctx) => {
     const chatId = ctx.chat.id;
     const game = gameManager.getGame(chatId);
