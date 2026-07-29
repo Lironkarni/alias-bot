@@ -72,3 +72,26 @@ test('premium expansion adds at least 100 net new words to every difficulty', ()
     assert.ok(HARD_WORDS.includes(word), `missing expanded hard word: ${word}`);
   }
 });
+
+test('premium pools are rounded to exact target sizes with no overlaps', () => {
+  assert.equal(PREMIUM_EASY_WORDS.length, 1000);
+  assert.equal(MEDIUM_WORDS.length, 1000);
+  assert.equal(HARD_WORDS.length, 500);
+
+  const allPremiumWords = [...PREMIUM_EASY_WORDS, ...MEDIUM_WORDS, ...HARD_WORDS];
+  assert.equal(allPremiumWords.length, 2500);
+  assert.equal(new Set(allPremiumWords).size, 2500);
+
+  for (const word of ['אבוקוס', 'בולדוזר', 'גמל שלמה', 'מכונת כתיבה', 'פומפייה']) {
+    assert.ok(PREMIUM_EASY_WORDS.includes(word), `missing rounded easy word: ${word}`);
+    assert.ok(!WORDS.includes(word), `rounded premium word leaked into free pool: ${word}`);
+  }
+
+  for (const word of ['אבטחת איכות', 'אגדה אורבנית', 'ארנק דיגיטלי', 'חוות שרתים', 'קוד מקור']) {
+    assert.ok(MEDIUM_WORDS.includes(word), `missing rounded medium word: ${word}`);
+  }
+
+  for (const word of ['אימפרטיב קטגורי', 'בינה קולקטיבית', 'הומאוסטזיס', 'כשל עלות שקועה', 'למידה עמוקה']) {
+    assert.ok(HARD_WORDS.includes(word), `missing rounded hard word: ${word}`);
+  }
+});
