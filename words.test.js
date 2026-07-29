@@ -95,3 +95,30 @@ test('premium pools are rounded to exact target sizes with no overlaps', () => {
     assert.ok(HARD_WORDS.includes(word), `missing rounded hard word: ${word}`);
   }
 });
+
+test('linguistic duplicates are removed while legacy gender variants remain', () => {
+  const allWords = [...PREMIUM_EASY_WORDS, ...MEDIUM_WORDS, ...HARD_WORDS];
+
+  for (const pair of [
+    ['מטריה', 'מטרייה'],
+    ['לוויתן', 'לווייתן'],
+    ['ג׳ירפה', 'גירפה'],
+    ['כדורסל', 'כדור סל'],
+    ['מאחורי הקלעים', 'אחורי הקלעים'],
+    ['נבואה שמגשימה את עצמה', 'נבואה המגשימה את עצמה'],
+  ]) {
+    assert.ok(
+      !(allWords.includes(pair[0]) && allWords.includes(pair[1])),
+      `linguistic duplicate remains: ${pair.join(' / ')}`,
+    );
+  }
+
+  for (const pair of [
+    ['רופא', 'רופאה'],
+    ['שוטר', 'שוטרת'],
+    ['תלמיד', 'תלמידה'],
+  ]) {
+    assert.ok(allWords.includes(pair[0]), `missing legacy masculine variant: ${pair[0]}`);
+    assert.ok(allWords.includes(pair[1]), `missing legacy feminine variant: ${pair[1]}`);
+  }
+});
