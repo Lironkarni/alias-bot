@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 
 const registerBotHandlers = require('./bot');
 const GameManager = require('./gameManager');
+const { registerLeaderboardHandlers, installCompletedGameTracking } = require('./leaderboard');
 const { validateInitData } = require('./telegramAuth');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -31,7 +32,9 @@ const io = new Server(server, { cors: { origin: '*' } });
 const bot = new Telegraf(BOT_TOKEN);
 const gameManager = new GameManager(bot, io, { botUsername: BOT_USERNAME, miniAppShortName: MINIAPP_SHORTNAME });
 
+installCompletedGameTracking(gameManager);
 registerBotHandlers(bot, gameManager);
+registerLeaderboardHandlers(bot);
 
 // ---------- Socket.io: תקשורת עם ה-Mini App ----------
 
@@ -97,6 +100,7 @@ async function start() {
       { command: 'start', description: 'פתיחת משחק חדש בקבוצה' },
       { command: 'join', description: 'הצטרפות למשחק פעיל' },
       { command: 'players', description: 'הצגת משתתפי המשחק' },
+      { command: 'leaderboard', description: 'לוח הניצחונות של הקבוצה' },
       { command: 'endgame', description: 'סגירת המשחק' },
       { command: 'premium', description: 'ניהול מנוי פרימיום' },
     ])
