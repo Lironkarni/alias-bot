@@ -61,34 +61,39 @@ async function recordCompletedGame(participants, winners) {
   }
 }
 
-function pairsToWordList(raw) {
-  if (!Array.isArray(raw)) return [];
-  const result = [];
-  for (let i = 0; i < raw.length; i += 2) {
-    result.push({ word: raw[i], count: Number(raw[i + 1]) || 0 });
+function hashEntries(raw) {
+  if (Array.isArray(raw)) {
+    const entries = [];
+    for (let i = 0; i < raw.length; i += 2) entries.push([raw[i], raw[i + 1]]);
+    return entries;
   }
-  return result.sort((a, b) => a.word.localeCompare(b.word, 'he'));
+  if (raw && typeof raw === 'object') return Object.entries(raw);
+  return [];
+}
+
+function hashToWordList(raw) {
+  return hashEntries(raw)
+    .map(([word, count]) => ({ word, count: Number(count) || 0 }))
+    .sort((a, b) => a.word.localeCompare(b.word, 'he'));
 }
 
 async function readHash(key) {
   return (await redis(['HGETALL', key])) || [];
 }
 
-function hashPairsToObject(raw) {
-  const obj = {};
-  for (let i = 0; i < raw.length; i += 2) obj[raw[i]] = Number(raw[i + 1]) || 0;
-  return obj;
+function hashToNumberObject(raw) {
+  return Object.fromEntries(hashEntries(raw).map(([field, value]) => [field, Number(value) || 0]));
 }
 
 async function getStatistics(userId) {
-  const summary = hashPairsToObject(await readHash(summaryKey(userId)));
+  const summary = hashToNumberObject(await readHash(summaryKey(userId)));
   const difficulties = ['easy', 'medium', 'hard'];
   const successfulWords = {};
   const skippedWords = {};
 
   for (const difficulty of difficulties) {
-    successfulWords[difficulty] = pairsToWordList(await readHash(wordsKey(userId, 'correct', difficulty)));
-    skippedWords[difficulty] = pairsToWordList(await readHash(wordsKey(userId, 'skipped', difficulty)));
+    successfulWords[difficulty] = hashToWordList(await readHash(wordsKey(userId, 'correct', difficulty)));
+    skippedWords[difficulty] = hashToWordList(await readHash(wordsKey(userId, 'skipped', difficulty)));
   }
 
   const revealedWords = summary.revealedWords || 0;
