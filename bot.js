@@ -1,6 +1,32 @@
 const { DIFFICULTY_LABELS } = require('./words');
 const subscriptionStore = require('./subscriptionStore');
+const personalPremiumStore = require('./personalPremiumStore');
 const { registerPremiumHandlers, showPremiumMenu } = require('./premium');
+
+function baseDisplayName(user) {
+  if (user.username) return user.first_name ? `${user.first_name} (@${user.username})` : `@${user.username}`;
+  return user.first_name || 'שחקן';
+}
+
+async function playerForGame(user) {
+  let isPersonalPremium = false;
+
+  try {
+    const status = await personalPremiumStore.getSubscriptionStatus(user.id);
+    isPersonalPremium = status.isPremium;
+  } catch (error) {
+    console.error('Failed to read personal premium status:', error);
+  }
+
+  if (!isPersonalPremium) return user;
+
+  return {
+    ...user,
+    first_name: `🌟 ${baseDisplayName(user)} 🌟`,
+    username: undefined,
+    isPersonalPremium: true,
+  };
+}
 
 function registerBotHandlers(bot, gameManager) {
   registerPremiumHandlers(bot, subscriptionStore);
@@ -15,23 +41,38 @@ function registerBotHandlers(bot, gameManager) {
 
     const chatId = ctx.chat.id;
 
-    let isPremium = false;
+    let groupIsPremium = false;
     if (subscriptionStore.isConfigured()) {
       try {
         await subscriptionStore.ensureGroup(ctx.chat);
         const subscription = await subscriptionStore.getSubscriptionStatus(chatId);
-        isPremium = subscription.isPremium;
+        groupIsPremium = subscription.isPremium;
       } catch (error) {
         console.error('Failed to read group subscription from Redis:', error);
       }
     }
+
+    let personalIsPremium = false;
+    try {
+      const personalSubscription = await personalPremiumStore.getSubscriptionStatus(ctx.from.id);
+      personalIsPremium = personalSubscription.isPremium;
+    } catch (error) {
+      console.error('Failed to read personal premium subscription:', error);
+    }
+
+    const isPremium = groupIsPremium || personalIsPremium;
+    const premiumSource = groupIsPremium ? 'group' : personalIsPremium ? 'personal' : 'free';
 
     const existing = gameManager.getGame(chatId);
     if (existing && existing.status !== 'finished') {
       return ctx.reply('כבר יש משחק פעיל בקבוצה הזו. מנהל המשחק או מנהלי הקבוצה יכולים לסגור אותו עם /endgame.');
     }
 
-    const game = gameManager.createGame(chatId, ctx.from, { isPremium });
+    const host = await playerForGame(ctx.from);
+    const game = gameManager.createGame(chatId, host, { isPremium });
+    game.premiumSource = premiumSource;
+    game.premiumActivatedBy = personalIsPremium && !groupIsPremium ? String(ctx.from.id) : null;
+
     const sent = await ctx.reply(gameManager.lobbyText(game), {
       reply_markup: gameManager.lobbyKeyboard(game),
     });
@@ -77,7 +118,8 @@ function registerBotHandlers(bot, gameManager) {
     const game = gameManager.getGame(chatId);
     if (!game) return ctx.reply('אין משחק פעיל כרגע. אפשר להתחיל אחד עם /start.');
 
-    const result = gameManager.joinMidGame(chatId, ctx.from);
+    const player = await playerForGame(ctx.from);
+    const result = gameManager.joinMidGame(chatId, player);
     if (result.error === 'already_joined') return ctx.reply('כבר הצטרפת למשחק! 🙂');
     if (result.error) return ctx.reply('לא ניתן להצטרף כרגע.');
 
@@ -93,7 +135,7 @@ function registerBotHandlers(bot, gameManager) {
     }
 
     const teamEmoji = result.team === 1 ? '🔵' : '🔴';
-    return ctx.reply(`✋ ${teamEmoji} ${ctx.from.first_name || 'שחקן'} הצטרף/ה למשחק ותשתתף בקבוצה ${result.team} מהתור הבא שלה!`);
+    return ctx.reply(`✋ ${teamEmoji} ${player.first_name || 'שחקן'} הצטרף/ה למשחק ותשתתף בקבוצה ${result.team} מהתור הבא שלה!`);
   });
 
   bot.action('join', async (ctx) => {
@@ -103,7 +145,8 @@ function registerBotHandlers(bot, gameManager) {
       return ctx.answerCbQuery('אין לובי פעיל כרגע.', { show_alert: true });
     }
 
-    gameManager.addPlayer(chatId, ctx.from);
+    const player = await playerForGame(ctx.from);
+    gameManager.addPlayer(chatId, player);
     await ctx.answerCbQuery('הצטרפת למשחק!');
 
     try {
@@ -127,7 +170,7 @@ function registerBotHandlers(bot, gameManager) {
       return ctx.answerCbQuery('רק מנהל המשחק יכול לשנות את רמת הקושי.', { show_alert: true });
     }
     if (result.error === 'premium_required') {
-      return ctx.answerCbQuery('רמות בינוני וקשה זמינות רק לקבוצות עם מנוי פרימיום.', { show_alert: true });
+      return ctx.answerCbQuery('רמות בינוני וקשה זמינות רק במשחק פרימיום.', { show_alert: true });
     }
 
     await ctx.answerCbQuery(`רמת קושי: ${DIFFICULTY_LABELS[result.game.difficulty]}`);
@@ -152,7 +195,7 @@ function registerBotHandlers(bot, gameManager) {
       return ctx.answerCbQuery('רק מנהל המשחק יכול לשנות את מצב הדילוג.', { show_alert: true });
     }
     if (result.error === 'premium_required') {
-      return ctx.answerCbQuery('מצב קנס על דילוג זמין רק לקבוצות עם מנוי פרימיום.', { show_alert: true });
+      return ctx.answerCbQuery('מצב קנס על דילוג זמין רק במשחק פרימיום.', { show_alert: true });
     }
 
     await ctx.answerCbQuery(`קנס על דילוג: ${result.game.skipPenaltyEnabled ? 'פעיל' : 'כבוי'}`);
