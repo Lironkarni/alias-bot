@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const registerBotHandlers = require('./bot');
 const GameManager = require('./gameManager');
 const { registerLeaderboardHandlers, installCompletedGameTracking } = require('./leaderboard');
+const { registerHelpHandler } = require('./help');
 const { validateInitData } = require('./telegramAuth');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -35,6 +36,7 @@ const gameManager = new GameManager(bot, io, { botUsername: BOT_USERNAME, miniAp
 installCompletedGameTracking(gameManager);
 registerBotHandlers(bot, gameManager);
 registerLeaderboardHandlers(bot);
+registerHelpHandler(bot);
 
 // ---------- Socket.io: תקשורת עם ה-Mini App ----------
 
@@ -98,6 +100,7 @@ async function start() {
   await bot.telegram
     .setMyCommands([
       { command: 'start', description: 'פתיחת משחק חדש בקבוצה' },
+      { command: 'help', description: 'הוראות המשחק' },
       { command: 'join', description: 'הצטרפות למשחק פעיל' },
       { command: 'players', description: 'הצגת משתתפי המשחק' },
       { command: 'leaderboard', description: 'לוח הניצחונות של הקבוצה' },
