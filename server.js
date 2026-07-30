@@ -9,6 +9,11 @@ const registerBotHandlers = require('./bot');
 const GameManager = require('./gameManager');
 const { registerLeaderboardHandlers, installCompletedGameTracking } = require('./leaderboard');
 const { registerHelpHandler } = require('./help');
+const {
+  registerStatisticsHandlers,
+  registerStatisticsApi,
+  installPersonalStatisticsTracking,
+} = require('./statistics');
 const { validateInitData } = require('./telegramAuth');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -26,6 +31,7 @@ if (!BOT_TOKEN || !BOT_USERNAME) {
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+registerStatisticsApi(app, { botToken: BOT_TOKEN });
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
@@ -34,9 +40,11 @@ const bot = new Telegraf(BOT_TOKEN);
 const gameManager = new GameManager(bot, io, { botUsername: BOT_USERNAME, miniAppShortName: MINIAPP_SHORTNAME });
 
 installCompletedGameTracking(gameManager);
+installPersonalStatisticsTracking(gameManager);
 registerBotHandlers(bot, gameManager);
 registerLeaderboardHandlers(bot);
 registerHelpHandler(bot);
+registerStatisticsHandlers(bot, { publicUrl: PUBLIC_URL });
 
 // ---------- Socket.io: תקשורת עם ה-Mini App ----------
 
@@ -101,6 +109,7 @@ async function start() {
     .setMyCommands([
       { command: 'start', description: 'פתיחת משחק חדש בקבוצה' },
       { command: 'help', description: 'הוראות המשחק' },
+      { command: 'statistics', description: 'הסטטיסטיקות האישיות שלי' },
       { command: 'join', description: 'הצטרפות למשחק פעיל' },
       { command: 'players', description: 'הצגת משתתפי המשחק' },
       { command: 'leaderboard', description: 'לוח הניצחונות של הקבוצה' },

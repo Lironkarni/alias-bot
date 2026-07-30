@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>הסטטיסטיקות שלי</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="statistics.css" />
+</head>
+<body>
+  <main class="statistics-app">
+    <header>
+      <h1>📊 הסטטיסטיקות שלי</h1>
+      <p>כל הביצועים שלך באליאס במקום אחד</p>
+    </header>
+
+    <nav class="tabs" aria-label="מסכי סטטיסטיקות">
+      <button class="tab active" data-tab="summary">📊 סיכום</button>
+      <button class="tab" data-tab="successful">✅ הצלחתי</button>
+      <button class="tab" data-tab="skipped">⏭️ דילגתי</button>
+    </nav>
+
+    <section id="loading" class="state-card">טוען נתונים…</section>
+    <section id="error" class="state-card hidden"></section>
+
+    <section id="summary" class="tab-panel hidden"></section>
+    <section id="successful" class="tab-panel hidden"></section>
+    <section id="skipped" class="tab-panel hidden"></section>
+  </main>
+
+  <script src="statistics.js"></script>
+</body>
+</html>
