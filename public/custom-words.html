@@ -1,1 +1,94 @@
-<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>מילים בהתאמה אישית</title><script src="https://telegram.org/js/telegram-web-app.js"></script><link rel="stylesheet" href="custom-words.css"></head><body><main><h1>📋 מילים בהתאמה אישית</h1><div id="count">0 / 500 מילים</div><nav><button data-tab="add" class="active">➕ הוספה</button><button data-tab="list">📚 המילים שלי</button><button data-tab="manage">⚙️ ניהול</button></nav><section id="add" class="tab"><textarea id="input" placeholder="מילה אחת, רשימה בשורות או מילים מופרדות בפסיקים"></textarea><button id="addBtn">הוסף מילים</button><p id="result"></p></section><section id="list" class="tab hidden"><input id="search" placeholder="חיפוש"><div id="words"></div><p id="playHint"></p><a id="playBtn" class="action hidden">⭐ שחק עם המאגר האישי</a></section><section id="manage" class="tab hidden"><button id="exportBtn">📤 ייצוא וגיבוי</button><button id="clearBtn" class="danger">🗑️ ניקוי המאגר</button></section></main><script src="custom-words.js"></script></body></html>
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>המילים האישיות שלי</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="custom-words.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero-card">
+      <div class="hero-icon">📋</div>
+      <div class="hero-copy">
+        <span class="premium-label">ALIAS PREMIUM</span>
+        <h1>המאגר האישי שלך</h1>
+        <p>בנה משחק אליאס משלך עם מילים שרק אתה בוחר.</p>
+      </div>
+      <div class="counter-card">
+        <strong id="count">0 / 500 מילים</strong>
+        <span>לפחות 60 מילים להפעלת משחק</span>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="ניווט במאגר">
+      <button data-tab="add" class="active"><span>➕</span> הוספה</button>
+      <button data-tab="list"><span>📚</span> המילים שלי</button>
+      <button data-tab="manage"><span>⚙️</span> ניהול</button>
+    </nav>
+
+    <section id="add" class="tab panel">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">הוספה מהירה</span>
+          <h2>הוסף מילים למאגר</h2>
+        </div>
+        <span class="section-icon">✨</span>
+      </div>
+
+      <label for="input">מילה אחת או רשימה שלמה</label>
+      <textarea id="input" placeholder="לדוגמה:&#10;כלב&#10;חתול&#10;מקרר&#10;&#10;אפשר גם להפריד בפסיקים"></textarea>
+      <p class="input-help">2–30 תווים למילה · ללא כפילויות · אפשר להדביק עד מאות מילים בבת אחת</p>
+      <button id="addBtn" class="primary-btn">➕ הוסף למאגר</button>
+      <p id="result" class="result-message"></p>
+    </section>
+
+    <section id="list" class="tab panel hidden">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">המאגר שלך</span>
+          <h2>כל המילים</h2>
+        </div>
+        <span class="section-icon">📚</span>
+      </div>
+
+      <div class="search-wrap">
+        <span>🔎</span>
+        <input id="search" placeholder="חיפוש מילה">
+      </div>
+
+      <div id="words" class="words-list"></div>
+
+      <div class="play-card">
+        <p id="playHint"></p>
+        <a id="playBtn" class="action hidden">⭐ שחק עם המאגר האישי</a>
+      </div>
+    </section>
+
+    <section id="manage" class="tab panel hidden">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">כלי ניהול</span>
+          <h2>גיבוי ושליטה במאגר</h2>
+        </div>
+        <span class="section-icon">🛠️</span>
+      </div>
+
+      <div class="manage-grid">
+        <button id="exportBtn" class="manage-card">
+          <span class="manage-icon">📤</span>
+          <span><strong>ייצוא וגיבוי</strong><small>הורדת כל המילים לקובץ טקסט</small></span>
+        </button>
+
+        <button id="clearBtn" class="manage-card danger">
+          <span class="manage-icon">🗑️</span>
+          <span><strong>ניקוי המאגר</strong><small>מחיקת כל המילים לאחר אישור</small></span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script src="custom-words.js"></script>
+</body>
+</html>
