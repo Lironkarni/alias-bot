@@ -15,14 +15,13 @@ async function redis(command) {
   return payload.result;
 }
 function normalizeWord(value) { return String(value || '').trim().replace(/\s+/g, ' '); }
-const BLOCKED = ['זונה','שרמוטה','כוס','זין','קוקסינל','fuck','shit','bitch'];
+const BLOCKED = new Set(['שרמוטה','קוקסינל','fuck','shit','bitch','motherfucker']);
 function validateWord(value) {
   const word = normalizeWord(value);
   if (word.length < 2) return { ok: false, reason: 'קצרה מדי' };
   if (word.length > 30) return { ok: false, reason: 'ארוכה מדי' };
   if (!/^[\p{L}\p{N}\s\-׳״'\"]+$/u.test(word)) return { ok: false, reason: 'מכילה אימוג׳י או סימנים לא מותרים' };
-  const lower = word.toLocaleLowerCase('he');
-  if (BLOCKED.some((item) => lower.includes(item))) return { ok: false, reason: 'תוכן לא מאושר' };
+  if (BLOCKED.has(word.toLocaleLowerCase('he'))) return { ok: false, reason: 'תוכן לא מאושר' };
   return { ok: true, word };
 }
 async function listWords(userId) {
