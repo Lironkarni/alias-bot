@@ -20,7 +20,7 @@ function validateWord(value) {
   const word = normalizeWord(value);
   if (word.length < 2) return { ok: false, reason: 'קצרה מדי' };
   if (word.length > 30) return { ok: false, reason: 'ארוכה מדי' };
-  if (!/^[\p{L}\p{N}\s\-׳״'\"]+$/u.test(word)) return { ok: false, reason: 'מכילה אימוג׳י או סימנים לא מותרים' };
+  if (!/^[\p{L}\p{N}\s׳״'"-]+$/u.test(word)) return { ok: false, reason: 'מכילה אימוג׳י או סימנים לא מותרים' };
   if (BLOCKED.has(word.toLocaleLowerCase('he'))) return { ok: false, reason: 'תוכן לא מאושר' };
   return { ok: true, word };
 }
