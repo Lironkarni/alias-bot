@@ -65,10 +65,14 @@ function registerStatisticsApi(app, { botToken }) {
   });
 }
 
+function isTrackableWordGame(game) {
+  return Boolean(game && game.wordMode !== 'custom');
+}
+
 function installPersonalStatisticsTracking(gameManager) {
   const originalCorrect = gameManager.handleCorrect.bind(gameManager);
   gameManager.handleCorrect = (game) => {
-    const event = game && game.turnActive && game.currentPlayer && game.currentWord
+    const event = isTrackableWordGame(game) && game.turnActive && game.currentPlayer && game.currentWord
       ? { userId: game.currentPlayer.id, difficulty: game.difficulty, word: game.currentWord }
       : null;
     const result = originalCorrect(game);
@@ -83,7 +87,7 @@ function installPersonalStatisticsTracking(gameManager) {
 
   const originalSkip = gameManager.handleSkip.bind(gameManager);
   gameManager.handleSkip = (game) => {
-    const event = game && game.turnActive && game.currentPlayer && game.currentWord
+    const event = isTrackableWordGame(game) && game.turnActive && game.currentPlayer && game.currentWord
       ? { userId: game.currentPlayer.id, difficulty: game.difficulty, word: game.currentWord }
       : null;
     const result = originalSkip(game);
@@ -99,7 +103,7 @@ function installPersonalStatisticsTracking(gameManager) {
   const originalConcludeTurn = gameManager._concludeTurn.bind(gameManager);
   gameManager._concludeTurn = async (chatId, reason) => {
     const game = gameManager.getGame(chatId);
-    const event = game && game.turnActive && game.currentTurnToken && game.currentPlayer && game.currentWord
+    const event = isTrackableWordGame(game) && game.turnActive && game.currentTurnToken && game.currentPlayer && game.currentWord
       ? { userId: game.currentPlayer.id, difficulty: game.difficulty, word: game.currentWord }
       : null;
     const result = await originalConcludeTurn(chatId, reason);
@@ -115,7 +119,7 @@ function installPersonalStatisticsTracking(gameManager) {
   const originalCloseGame = gameManager.closeGame.bind(gameManager);
   gameManager.closeGame = (chatId, requesterId, options) => {
     const game = gameManager.getGame(chatId);
-    const event = game && game.turnActive && game.currentPlayer && game.currentWord
+    const event = isTrackableWordGame(game) && game.turnActive && game.currentPlayer && game.currentWord
       ? { userId: game.currentPlayer.id, difficulty: game.difficulty, word: game.currentWord }
       : null;
     const result = originalCloseGame(chatId, requesterId, options);
