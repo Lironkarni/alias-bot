@@ -12,6 +12,7 @@ const { registerHelpHandler } = require('./help');
 const { registerStatisticsHandlers, registerStatisticsApi, installPersonalStatisticsTracking } = require('./statistics');
 const { registerCustomWordsHandlers, registerCustomWordsApi } = require('./customWords');
 const { installCustomGameMode, createCustomGameStarter } = require('./customGameMode');
+const { installPremiumPromotions } = require('./promotions');
 const { validateInitData } = require('./telegramAuth');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -37,6 +38,7 @@ const gameManager = new GameManager(bot, io, { botUsername: BOT_USERNAME, miniAp
 installCompletedGameTracking(gameManager);
 installPersonalStatisticsTracking(gameManager);
 installCustomGameMode(gameManager);
+installPremiumPromotions(gameManager);
 const startCustomGame = createCustomGameStarter(gameManager);
 registerCustomWordsHandlers(bot, { publicUrl: PUBLIC_URL, botUsername: BOT_USERNAME, startCustomGame });
 registerBotHandlers(bot, gameManager);
