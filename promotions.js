@@ -1,4 +1,4 @@
-const PROMOTION_INTERVAL = 3;
+const PROMOTION_INTERVAL = 2;
 
 const GROUP_PROMOTION_TEXT =
   'רוצים לשדרג את המשחק?\n\n' +
